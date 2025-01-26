@@ -1,0 +1,70 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: devops-tools
+  labels:
+    app: jenkins-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins-master
+  strategy:
+    type: Recreate # Потому что stateful
+  template:
+    metadata:
+      labels:
+        app: jenkins-master
+    spec:
+      securityContext: # Действует на все созданные контейнеры в этом Deployment
+        fsGroup: 1000 # Группа по умолчанию для созданных файлов и каталогов в контейнере
+        runAsUser: 1000 # Контейнер запускается под этим пользователем
+        runAsNonRoot: true # Контейнер не будет запущен, если пользователь root
+      serviceAccountName: jenkins
+      containers:
+        - name: jenkins
+          image: jenkins/jenkins:2.479.3 # Фиксируем версию
+          resources: # Ограничиваем ресурсы
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+            requests:
+              memory: "500Mi"
+              cpu: "500m"
+          ports: # Открываем необходимые порты
+            - name: http
+              containerPort: 8080
+            - name: jnlp
+              containerPort: 50000
+          livenessProbe: # Проверка работоспособности контейнера
+            httpGet:
+              path: "/login"
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe: # Проверка готовности контейнера
+            httpGet:
+              path: "/login"
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: jenkins-data
+              mountPath: /var/jenkins_home
+          securityContext: # Действует только для этого контейнера
+            allowPrivilegeEscalation: false # Отключаем возможность повышать привилегии 
+            capabilities: 
+              drop:
+                - ALL # Отключаем все доп привилегии 
+            seccompProfile:
+              type: RuntimeDefault # Используем стандартный профиль seccomp
+      volumes:
+        - name: jenkins-data
+          persistentVolumeClaim: # RWO
+              claimName: jenkins-pv-claim

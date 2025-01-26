@@ -1,0 +1,27 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  labels:
+    app: jenkins-master
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production # Указываем анатацию для cert-manager установленного в кластере k8s 
+  name: jenkins
+  namespace: devops-tools
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: jenkins.<domain>  # Указываем DNS
+      http:
+        paths:
+          - backend:
+              service:
+                name: jenkins # Указываем название service
+                port:
+                  number: 8080 # Указываем порт service
+            path: / # Путь по умолчанию 
+            pathType: Prefix
+  tls:
+    - hosts:
+        - jenkins.<domain> # Указываем DNS для сертификата
+      secretName: jenkins-cert # Название секрета, где хранится сертификат
